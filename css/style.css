@@ -70,7 +70,7 @@ a { color: inherit; }
 /* カードの行 */
 .row {
   position: relative; width: 100%; text-align: left;
-  padding: 18px 44px 18px 0; border: 0; border-bottom: 1px solid var(--rule); background: transparent;
+  padding: 18px 32px 18px 0; border: 0; border-bottom: 1px solid var(--rule); background: transparent;
   display: flex; flex-direction: column; gap: 4px;
 }
 .row__meta { font-size: 12px; line-height: 1.9; color: var(--sub); }
@@ -78,7 +78,7 @@ a { color: inherit; }
 .row__name { font-family: var(--mincho); font-weight: 500; font-size: 22px; line-height: 1.4; letter-spacing: 0.06em; }
 .row__note { font-size: 13px; line-height: 1.8; color: var(--body); }
 .ribbon {
-  position: absolute; top: -1px; right: 4px; width: 24px; height: 70px; padding-top: 8px;
+  position: absolute; top: -1px; right: 30px; width: 24px; height: 70px; padding-top: 8px;
   background: var(--shu); color: #fff;
   display: flex; justify-content: center; writing-mode: vertical-rl;
   font-size: 11px; font-weight: 500; letter-spacing: 0.2em;
@@ -202,7 +202,7 @@ legend { padding: 0 0 6px; font-size: 12px; color: var(--sub); }
 
 /* 知らせ */
 #toast {
-  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 92px); transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 84px); transform: translateX(-50%); /* 下のタブのすぐ上 */
   max-width: calc(100% - 56px); padding: 10px 16px; background: var(--sumi); color: var(--paper);
   font-size: 13px; line-height: 1.6; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 20;
 }
@@ -223,3 +223,20 @@ legend { padding: 0 0 6px; font-size: 12px; color: var(--sub); }
   background-repeat: no-repeat; background-position: right 10px center;
 }
 .error { margin: 0; font-size: 13px; line-height: 1.8; color: var(--shu); }
+
+/* 押せる行:右端の矢印と、押したときの色 */
+.row--planned { padding-right: 64px; }
+.row__arrow { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); display: flex; }
+.row:active, .more:active { background: #ece6d9; }
+
+/* ページの詳細の操作 */
+.sheet__top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sheet__close { flex: none; min-width: 44px; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--ai); font-size: 14px; font-weight: 500; }
+.sheet__planned { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--shu); }
+.sheet__pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.toggle {
+  min-height: 48px; border: 1px solid var(--ai); background: transparent; color: var(--ai);
+  display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 500;
+}
+.toggle[aria-pressed="true"] { border-color: var(--shu); color: var(--shu); }
+.primary:active, .secondary:active, .toggle:active { opacity: 0.8; }

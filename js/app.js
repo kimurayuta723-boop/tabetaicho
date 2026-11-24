@@ -26,7 +26,30 @@ const state = {
   setup: { step: 1, pass: "", role: "cook", query: "", results: [], place: null, payday: "", b1m: "", b1d: "", b2m: "", b2d: "", error: "" },
   confirmDelete: null,
   pendingRender: false,
+  editId: null, // 書き直し中のページのID
+  returnView: "today",
+  savedDraft: null, // 書き直しの前に書きかけていた内容
 };
+
+function startEdit(card) {
+  state.savedDraft = state.draft;
+  state.returnView = state.view;
+  state.editId = card.id;
+  const conds = card.conditions && card.conditions.length ? [...card.conditions] : ["anytime"];
+  state.draft = {
+    kind: card.kind || "want", name: card.name || "", conditions: conds, note: card.note || "",
+    photo: card.photo || null, link: card.link || "", showLink: Boolean(card.link),
+  };
+  state.sheet = null;
+  state.confirmDelete = null;
+  state.view = "write";
+}
+
+function endEdit() {
+  state.editId = null;
+  state.draft = state.savedDraft || newDraft();
+  state.savedDraft = null;
+}
 
 /* ---------- 小さな道具 ---------- */
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -137,14 +160,21 @@ function nav() {
   </nav>`;
 }
 
+// 押せることが分かるよう、右端に矢印を付ける
 function cardRow(card) {
   const meta = `<b>${KIND_LABEL[card.kind] || ""}</b>${esc(conditionText(card))} ・ ${monthDay(card.createdAt)}に書いた`;
-  return `<button class="row" data-act="open-card" data-id="${esc(card.id)}">
+  return `<button class="row${card.planned ? " row--planned" : ""}" data-act="open-card" data-id="${esc(card.id)}" aria-label="${esc(card.name)}を開く">
     <span class="row__meta">${meta}</span>
     <span class="row__name">${esc(card.name)}</span>
     ${card.note ? `<span class="row__note">${esc(card.note)}</span>` : ""}
-    ${card.planned ? '<span class="ribbon" aria-label="今週つくる予定">今週</span>' : ""}
+    ${card.planned ? '<span class="ribbon" aria-hidden="true">今週</span>' : ""}
+    <span class="row__arrow" aria-hidden="true">${ICON_NEXT}</span>
   </button>`;
+}
+
+// しおりの形の小さな印。付いているときは朱で塗る
+function ribbonMark(on) {
+  return `<svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true"><path d="M1 0.7h8v12.2l-4-3.2-4 3.2z" fill="${on ? "#C0442C" : "none"}" stroke="${on ? "#C0442C" : "#22385A"}" stroke-width="1.3"/></svg>`;
 }
 
 function meter(count) {
@@ -188,7 +218,7 @@ function viewToday() {
 
   const mood = state.household.mood && state.household.mood.date === dateKey(now) ? state.household.mood.list || [] : [];
   const moodRow = `<div class="mood">
-    <span class="small">今日の気分(押すと二人の帖に伝わります)</span>
+    <span class="small">今日の気分</span>
     <div class="chips">
       ${["tired", "genki"].map((k) => `<button class="chip" data-act="mood" data-key="${k}" aria-pressed="${mood.includes(k)}">${CONDITIONS[k]}</button>`).join("")}
     </div>
@@ -207,7 +237,8 @@ function viewAll() {
 }
 
 function viewWrite() {
-  if (state.cards.length >= LIMIT) return viewFull();
+  const editing = Boolean(state.editId);
+  if (!editing && state.cards.length >= LIMIT) return viewFull();
   const d = state.draft;
   const groups = GROUPS.map((g) => `<div class="cond-group">
       <span class="cond-group__label">${g.label}</span>
@@ -221,7 +252,10 @@ function viewWrite() {
     ? `<div class="field"><label for="f-link">レシピのリンク</label><input id="f-link" class="input" type="url" inputmode="url" placeholder="https://" value="${esc(d.link)}" data-field="link"></div>`
     : `<button type="button" class="text-btn" data-act="show-link">${ICON_PLUS("#22385A")}レシピのリンク</button>`;
 
-  return band({ title: "書く", aside: `あと${LIMIT - state.cards.length}枚` }) +
+  const head = editing
+    ? band({ title: "書き直す", aside: "" })
+    : band({ title: "書く", aside: `あと${LIMIT - state.cards.length}枚` });
+  return head +
     `<main class="page">
       <form class="form" data-form="write" novalidate>
         <div class="seg" role="group" aria-label="種類">
@@ -242,9 +276,10 @@ function viewWrite() {
         </div>
         ${photo}
         ${link}
-        <button type="submit" class="primary form__submit">帖に書き込む</button>
+        <button type="submit" class="primary form__submit">${editing ? "保存する" : "帖に書き込む"}</button>
+        ${editing ? '<button type="button" class="secondary" data-act="cancel-edit">やめる</button>' : ""}
       </form>
-    </main>` + nav();
+    </main>` + (editing ? "" : nav()); // 書き直し中は下のタブを出さず、保存かもどるかに絞る
 }
 
 function viewFull() {
@@ -253,7 +288,7 @@ function viewFull() {
     `<main class="page">
       <div class="empty" style="padding-top:0;padding-bottom:22px">
         <p class="empty__title">帖がいっぱいです。</p>
-        <p class="empty__text">新しく書く前に、どれか1枚を取り下げてください。書いた日が古い順に並んでいます。</p>
+        <p class="empty__text">新しく書くには、どれか1枚を取り下げてください。</p>
       </div>
       <div class="list">
         ${list.map((c) => `<div class="list-item">
@@ -310,13 +345,12 @@ function viewSettings() {
   </div>`;
   return band({ title: "気温の基準", back: true }) +
     `<main class="page">
-      <p class="lead">その日の最高気温で「寒い日」「暑い日」を決めます。条件に合うページが、今日の画面に出てきます。</p>
+      <p class="lead">その日の最高気温で「寒い日」「暑い日」を決めます。</p>
       <div class="list">
         ${stepper("cold", "寒い日", "最高気温がこの温度以下", cold)}
         ${stepper("hot", "暑い日", "最高気温がこの温度以上", hot)}
       </div>
       <div class="preview"><span class="small">今日${state.weather && Number.isFinite(state.weather.max) ? `(最高${state.weather.max}℃)` : ""}は</span><strong>${preview}</strong></div>
-      <p class="small" style="margin-top:20px">変えた内容はすぐに反映され、二人の帖の両方に使われます。</p>
       <div class="section-gap">
         <p class="small">地域:${esc(hh.placeName || "未設定")} ・ この端末は「${state.role === "cook" ? "作る人" : "頼む人"}」</p>
         <button class="text-btn text-btn--quiet" data-act="reset">最初の設定をやり直す(帖の中身は消えません)</button>
@@ -332,11 +366,10 @@ function viewSheet() {
   let inner;
   if (s.type === "done") {
     inner = `<h2 class="sheet__name">${esc(card.name)}を作った</h2>
-      <p class="sheet__note">済んだページに移します。写真とひとことは、なくてもかまいません。</p>
       ${s.photo
         ? `<div class="inline-actions"><img class="thumb" src="${s.photo}" alt="作った料理の写真"><button class="text-btn text-btn--quiet" data-act="done-remove-photo">写真を外す</button></div>`
         : `<label class="text-btn">${ICON_PLUS("#22385A")}写真を添える<input class="visually-hidden" type="file" accept="image/*" data-file="done"></label>`}
-      <div class="field"><label for="f-comment">ひとこと</label>
+      <div class="field"><label for="f-comment">ひとこと(なくてもよい)</label>
         <input id="f-comment" class="input" type="text" maxlength="60" value="${esc(s.comment || "")}" data-field="comment"></div>
       <div class="sheet__actions">
         <button class="primary" data-act="done-save">済んだページに移す</button>
@@ -344,17 +377,23 @@ function viewSheet() {
       </div>`;
   } else {
     const cook = state.role === "cook";
-    inner = `<p class="row__meta" style="margin:0"><b style="color:#24221F;margin-right:8px">${KIND_LABEL[card.kind] || ""}</b>${esc(conditionText(card))} ・ ${monthDay(card.createdAt)}に書いた</p>
+    const confirming = state.confirmDelete === card.id;
+    inner = `<div class="sheet__top">
+        <p class="row__meta" style="margin:0"><b style="color:#24221F;margin-right:8px">${KIND_LABEL[card.kind] || ""}</b>${esc(conditionText(card))} ・ ${monthDay(card.createdAt)}に書いた</p>
+        <button class="sheet__close" data-act="close">閉じる</button>
+      </div>
       <h2 class="sheet__name">${esc(card.name)}</h2>
+      ${card.planned && !cook ? `<p class="sheet__planned">${ribbonMark(true)}今週つくる予定</p>` : ""}
       ${card.note ? `<p class="sheet__note">${esc(card.note)}</p>` : ""}
       ${card.photo ? `<img class="sheet__photo" src="${card.photo}" alt="${esc(card.name)}の参考写真">` : ""}
       ${card.link ? `<a class="text-btn" href="${esc(card.link)}" target="_blank" rel="noopener noreferrer">レシピを開く</a>` : ""}
-      ${card.planned && !cook ? '<p class="sheet__note">今週つくる予定です。</p>' : ""}
       <div class="sheet__actions">
         ${cook ? `<button class="primary" data-act="done-start">作った</button>
-          <button class="secondary" data-act="plan">${card.planned ? "今週つくるをやめる" : "今週つくる(しおりを付ける)"}</button>` : ""}
-        <button class="secondary" data-act="close">閉じる</button>
-        <button class="danger-btn" data-act="withdraw" data-id="${esc(card.id)}">${state.confirmDelete === card.id ? "本当に取り下げる" : "このページを取り下げる"}</button>
+        <div class="sheet__pair">
+          <button class="toggle" data-act="plan" aria-pressed="${Boolean(card.planned)}">${ribbonMark(card.planned)}今週つくる</button>
+          <button class="secondary" data-act="edit">書き直す</button>
+        </div>` : `<button class="secondary" data-act="edit">書き直す</button>`}
+        <button class="danger-btn" data-act="withdraw" data-id="${esc(card.id)}">${confirming ? "もう一度押すと取り下げます" : "取り下げる"}</button>
       </div>`;
   }
   return `<div class="backdrop" data-act="backdrop"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(card.name)}">${inner}</div></div>`;
@@ -420,6 +459,7 @@ app.addEventListener("focusout", () => {
 });
 
 function go(view) {
+  if (state.editId) endEdit(); // 書き直しの途中でほかの画面へ移ったら、書き直しはやめる
   state.view = view;
   state.sheet = null;
   state.confirmDelete = null;
@@ -497,11 +537,20 @@ const handlers = {
     const card = cardById(state.sheet && state.sheet.id);
     if (!card) return;
     try {
-      await data.updateCard(state.hid, card.id, { planned: !card.planned });
-      toast(card.planned ? "しおりを外しました。" : "しおりを付けました。相手の帖にも出ます。");
-      state.sheet = null;
-      render(true);
+      await data.updateCard(state.hid, card.id, { planned: !card.planned }); // ボタンの見た目が変わるので知らせは出さない
     } catch (err) { toast("保存できませんでした。通信を確かめてください。"); }
+  },
+  edit: () => {
+    const card = cardById(state.sheet && state.sheet.id);
+    if (!card) return;
+    startEdit(card);
+    render(true);
+    window.scrollTo(0, 0);
+  },
+  "cancel-edit": () => {
+    const back = state.returnView || "today";
+    endEdit();
+    go(back);
   },
   "done-start": () => { state.sheet = { type: "done", id: state.sheet.id, photo: null, comment: "" }; render(true); },
   "done-remove-photo": () => { state.sheet.photo = null; render(true); },
@@ -518,7 +567,7 @@ const handlers = {
       await data.addRecord(state.hid, record);
       await data.deleteCard(state.hid, card.id);
       state.sheet = null;
-      toast("済んだページに移しました。");
+      toast("済んだページに移しました");
       render(true);
     } catch (err) { toast("保存できませんでした。通信を確かめてください。"); }
   },
@@ -529,7 +578,7 @@ const handlers = {
       await data.deleteCard(state.hid, id);
       state.confirmDelete = null;
       state.sheet = null;
-      toast("取り下げました。");
+      toast("取り下げました");
       render(true);
     } catch (err) { toast("取り下げられませんでした。通信を確かめてください。"); }
   },
@@ -542,7 +591,7 @@ const handlers = {
         kind: r.kind || "want", name: r.name, conditions: r.conditions || [], note: r.note || "",
         link: r.link || "", photo: null, planned: false, createdAt: Date.now(), from: state.role,
       });
-      toast("帖に戻しました。");
+      toast("帖に戻しました");
     } catch (err) { toast("保存できませんでした。通信を確かめてください。"); }
   },
   mood: (t) => {
@@ -587,9 +636,26 @@ async function submitWrite() {
   const d = state.draft;
   const name = d.name.trim();
   if (!name) { toast("料理名を書いてください。"); return; }
-  if (state.cards.length >= LIMIT) { render(true); return; }
   const link = normalizeLink(d.link);
   if (d.link.trim() && !link) { toast("リンクの形が正しくありません。"); return; }
+  if (state.editId) {
+    const id = state.editId;
+    if (!cardById(id)) { toast("このページは取り下げられたか、済んだページに移っています。"); return; }
+    try {
+      await data.updateCard(state.hid, id, {
+        kind: d.kind, name, conditions: d.conditions.length ? d.conditions : ["anytime"],
+        note: d.note.trim(), photo: d.photo || null, link,
+      });
+      const back = state.returnView || "today";
+      endEdit();
+      toast("書き直しました");
+      go(back);
+    } catch (err) {
+      toast("保存できませんでした。写真が大きすぎるか、通信が切れています。");
+    }
+    return;
+  }
+  if (state.cards.length >= LIMIT) { render(true); return; }
   const card = {
     kind: d.kind, name, conditions: d.conditions.length ? d.conditions : ["anytime"],
     note: d.note.trim(), photo: d.photo || null, link, planned: false, createdAt: Date.now(), from: state.role,
@@ -597,7 +663,7 @@ async function submitWrite() {
   try {
     await data.addCard(state.hid, card);
     state.draft = newDraft();
-    toast("帖に書き込みました。");
+    toast("書き込みました");
     go("today");
   } catch (err) {
     toast("書き込めませんでした。写真が大きすぎるか、通信が切れています。");

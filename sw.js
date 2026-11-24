@@ -1,6 +1,6 @@
 // 画面の部品を端末に保存して、電波が弱いときもすぐ開けるようにする。
 // ファイルを更新したら VERSION の数字を上げてください(古い保存分が入れ替わります)。
-const VERSION = "tabetaicho-v3";
+const VERSION = "tabetaicho-v5";
 const FILES = [
   "./",
   "./index.html",
