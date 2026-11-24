@@ -177,7 +177,7 @@ function viewToday() {
   } else {
     const picked = pickToday(state.cards, flags);
     const rest = state.cards.length - picked.length;
-    const title = picked.length ? `今日はこの${picked.length}つ` : "今日に合うページはありません";
+    const title = picked.length ? "今日のおすすめ" : "今日に合うページはありません";
     body = `<h1 class="page__title">${title}</h1>
       ${picked.length ? picked.map(cardRow).join("") : '<p class="lead" style="margin-top:18px">今日の条件に合うページがありません。すべてのページから選べます。</p>'}
       <button class="more" data-act="go" data-view="all">
