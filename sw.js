@@ -1,6 +1,6 @@
 // 画面の部品を端末に保存して、電波が弱いときもすぐ開けるようにする。
 // ファイルを更新したら VERSION の数字を上げてください(古い保存分が入れ替わります)。
-const VERSION = "tabetaicho-v6";
+const VERSION = "tabetaicho-v7";
 const FILES = [
   "./",
   "./index.html",
@@ -17,7 +17,9 @@ const FILES = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // ブラウザの一時保存(GitHub Pagesでは最大10分)を通さず、必ずサーバーから最新を取る
+  const fresh = FILES.map((f) => new Request(f, { cache: "reload" }));
+  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(fresh)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
@@ -33,7 +35,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== self.location.origin) return;
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-cache" }) // 毎回サーバーに新しいか確かめる
       .then((res) => {
         const copy = res.clone();
         caches.open(VERSION).then((c) => c.put(event.request, copy));

@@ -7,6 +7,7 @@ import {
 } from "./logic.js";
 
 const LS = { hid: "tabetaicho.hid", role: "tabetaicho.role" };
+const APP_VERSION = "v7"; // 設定画面の下に表示。更新が届いたかの確認用
 const app = document.getElementById("app");
 const toastEl = document.getElementById("toast");
 
@@ -352,7 +353,7 @@ function viewSettings() {
       </div>
       <div class="preview"><span class="small">今日${state.weather && Number.isFinite(state.weather.max) ? `(最高${state.weather.max}℃)` : ""}は</span><strong>${preview}</strong></div>
       <div class="section-gap">
-        <p class="small">地域:${esc(hh.placeName || "未設定")} ・ この端末は「${state.role === "cook" ? "作る人" : "頼む人"}」</p>
+        <p class="small">地域:${esc(hh.placeName || "未設定")} ・ この端末は「${state.role === "cook" ? "作る人" : "頼む人"}」 ・ ${APP_VERSION}</p>
         <button class="text-btn text-btn--quiet" data-act="reset">最初の設定をやり直す(帖の中身は消えません)</button>
       </div>
     </main>`;
@@ -761,7 +762,20 @@ document.addEventListener("visibilitychange", () => {
 /* ---------- 起動 ---------- */
 async function init() {
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(() => { /* 登録できなくても動作する */ });
+    // 新しい版が届いたら、開いている画面も自動で読み込み直す
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register("./sw.js").then((reg) => {
+      // ホーム画面のアプリは閉じずに戻ってくることが多いので、戻るたびに新しい版を確かめる
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") reg.update().catch(() => {});
+      });
+    }).catch(() => { /* 登録できなくても動作する */ });
   }
   if (!data.isConfigured()) {
     app.innerHTML = viewMessage("Firebaseの設定がまだです。", "js/config.js に、Firebaseコンソールの設定値を貼り付けてください。手順は README.md にあります。");
