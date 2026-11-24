@@ -249,8 +249,8 @@ function viewWrite() {
     ? `<div class="inline-actions"><img class="thumb" src="${d.photo}" alt="添えた写真"><button type="button" class="text-btn text-btn--quiet" data-act="remove-photo">写真を外す</button></div>`
     : `<label class="text-btn">${ICON_PLUS("#22385A")}写真を添える<input class="visually-hidden" type="file" accept="image/*" data-file="draft"></label>`;
   const link = d.showLink
-    ? `<div class="field"><label for="f-link">レシピのリンク</label><input id="f-link" class="input" type="url" inputmode="url" placeholder="https://" value="${esc(d.link)}" data-field="link"></div>`
-    : `<button type="button" class="text-btn" data-act="show-link">${ICON_PLUS("#22385A")}レシピのリンク</button>`;
+    ? `<div class="field"><label for="f-link">リンク</label><input id="f-link" class="input" type="url" inputmode="url" placeholder="https://" value="${esc(d.link)}" data-field="link"></div>`
+    : `<button type="button" class="text-btn" data-act="show-link">${ICON_PLUS("#22385A")}リンクを添える</button>`;
 
   const head = editing
     ? band({ title: "書き直す", aside: "" })
@@ -263,7 +263,7 @@ function viewWrite() {
           <button type="button" data-act="kind" data-kind="make" aria-pressed="${d.kind === "make"}">作りたい</button>
         </div>
         <div class="field">
-          <label for="f-name">料理名</label>
+          <label for="f-name">${d.kind === "make" ? "作りたいもの" : "食べたいもの"}</label>
           <input id="f-name" class="input input--name" type="text" autocomplete="off" maxlength="40" value="${esc(d.name)}" data-field="name">
         </div>
         <fieldset>
@@ -316,12 +316,12 @@ function viewRecords() {
         <p class="record__meta"><span>${monthDay(r.doneAt)}</span>${KIND_LABEL[r.kind] || ""}</p>
         <h3 class="record__name">${esc(r.name)}</h3>
         ${r.comment ? `<p class="record__note">${esc(r.comment)}</p>` : ""}
-        <button class="text-btn" data-act="again" data-id="${esc(r.id)}">${ICON_AGAIN}また作ってほしい</button>
+        <button class="text-btn" data-act="again" data-id="${esc(r.id)}">${ICON_AGAIN}また食べたい</button>
       </div>
     </article>`;
   });
   return band({ title: "済んだページ", aside: list.length ? `これまでに${list.length}回` : "" }) +
-    `<main class="page">${html || '<div class="empty" style="padding-top:0"><p class="empty__title">まだ済んだページはありません。</p><p class="empty__text">作った料理は、ここに写真とひとことと一緒に残ります。</p></div>'}</main>` + nav();
+    `<main class="page">${html || '<div class="empty" style="padding-top:0"><p class="empty__title">まだ済んだページはありません。</p><p class="empty__text">食べたものは、ここに写真とひとことと一緒に残ります。</p></div>'}</main>` + nav();
 }
 
 function viewSettings() {
@@ -365,9 +365,9 @@ function viewSheet() {
   if (!card) return "";
   let inner;
   if (s.type === "done") {
-    inner = `<h2 class="sheet__name">${esc(card.name)}を作った</h2>
+    inner = `<h2 class="sheet__name">${esc(card.name)}を食べた</h2>
       ${s.photo
-        ? `<div class="inline-actions"><img class="thumb" src="${s.photo}" alt="作った料理の写真"><button class="text-btn text-btn--quiet" data-act="done-remove-photo">写真を外す</button></div>`
+        ? `<div class="inline-actions"><img class="thumb" src="${s.photo}" alt="食べたものの写真"><button class="text-btn text-btn--quiet" data-act="done-remove-photo">写真を外す</button></div>`
         : `<label class="text-btn">${ICON_PLUS("#22385A")}写真を添える<input class="visually-hidden" type="file" accept="image/*" data-file="done"></label>`}
       <div class="field"><label for="f-comment">ひとこと(なくてもよい)</label>
         <input id="f-comment" class="input" type="text" maxlength="60" value="${esc(s.comment || "")}" data-field="comment"></div>
@@ -383,14 +383,14 @@ function viewSheet() {
         <button class="sheet__close" data-act="close">閉じる</button>
       </div>
       <h2 class="sheet__name">${esc(card.name)}</h2>
-      ${card.planned && !cook ? `<p class="sheet__planned">${ribbonMark(true)}今週つくる予定</p>` : ""}
+      ${card.planned && !cook ? `<p class="sheet__planned">${ribbonMark(true)}今週たべる予定</p>` : ""}
       ${card.note ? `<p class="sheet__note">${esc(card.note)}</p>` : ""}
       ${card.photo ? `<img class="sheet__photo" src="${card.photo}" alt="${esc(card.name)}の参考写真">` : ""}
-      ${card.link ? `<a class="text-btn" href="${esc(card.link)}" target="_blank" rel="noopener noreferrer">レシピを開く</a>` : ""}
+      ${card.link ? `<a class="text-btn" href="${esc(card.link)}" target="_blank" rel="noopener noreferrer">リンクを開く</a>` : ""}
       <div class="sheet__actions">
-        ${cook ? `<button class="primary" data-act="done-start">作った</button>
+        ${cook ? `<button class="primary" data-act="done-start">食べた</button>
         <div class="sheet__pair">
-          <button class="toggle" data-act="plan" aria-pressed="${Boolean(card.planned)}">${ribbonMark(card.planned)}今週つくる</button>
+          <button class="toggle" data-act="plan" aria-pressed="${Boolean(card.planned)}">${ribbonMark(card.planned)}今週たべる</button>
           <button class="secondary" data-act="edit">書き直す</button>
         </div>` : `<button class="secondary" data-act="edit">書き直す</button>`}
         <button class="danger-btn" data-act="withdraw" data-id="${esc(card.id)}">${confirming ? "もう一度押すと取り下げます" : "取り下げる"}</button>
@@ -530,7 +530,7 @@ const handlers = {
   },
   "remove-photo": () => { state.draft.photo = null; render(true); },
   "show-link": () => { state.draft.showLink = true; render(true); const el = document.getElementById("f-link"); if (el) el.focus(); },
-  "open-card": (t) => { state.sheet = { type: "card", id: t.dataset.id }; state.confirmDelete = null; render(true); },
+  "open-card": (t) => { toastEl.classList.remove("show"); state.sheet = { type: "card", id: t.dataset.id }; state.confirmDelete = null; render(true); }, // 前の知らせがボタンに重ならないよう消す
   close: () => { state.sheet = null; state.confirmDelete = null; render(true); },
   backdrop: () => { state.sheet = null; state.confirmDelete = null; render(true); },
   plan: async () => {
@@ -635,7 +635,7 @@ const handlers = {
 async function submitWrite() {
   const d = state.draft;
   const name = d.name.trim();
-  if (!name) { toast("料理名を書いてください。"); return; }
+  if (!name) { toast(d.kind === "make" ? "作りたいものを書いてください" : "食べたいものを書いてください"); return; }
   const link = normalizeLink(d.link);
   if (d.link.trim() && !link) { toast("リンクの形が正しくありません。"); return; }
   if (state.editId) {
