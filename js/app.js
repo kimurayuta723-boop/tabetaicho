@@ -23,7 +23,7 @@ const state = {
   view: "today",
   draft: newDraft(),
   sheet: null,
-  setup: { step: 1, pass: "", role: "cook", query: "", results: [], place: null, payday: "", birthday1: "", birthday2: "", error: "" },
+  setup: { step: 1, pass: "", role: "cook", query: "", results: [], place: null, payday: "", b1m: "", b1d: "", b2m: "", b2d: "", error: "" },
   confirmDelete: null,
   pendingRender: false,
 };
@@ -95,11 +95,24 @@ function normalizeLink(s) {
   }
 }
 
-function parseBirthday(s) {
-  const m = (s || "").normalize("NFKC").trim().match(/^(\d{1,2})\s*[\/\-月.]\s*(\d{1,2})日?$/);
-  if (!m) return null;
-  const mm = Number(m[1]); const dd = Number(m[2]);
-  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+// 誕生日は月と日をそれぞれ一覧から選ぶ(iPhoneの数字キーボードには「/」がないため)
+function birthdayPicker(id, label, monthKey, dayKey) {
+  const s = state.setup;
+  const opts = (n, cur) => `<option value="">—</option>` +
+    Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${String(i + 1) === cur ? " selected" : ""}>${i + 1}</option>`).join("");
+  return `<div class="field"><span class="field__label" id="${id}">${label}(なくてもよい)</span>
+    <div class="date-pick" role="group" aria-labelledby="${id}">
+      <select class="select" aria-label="月" data-field="setup.${monthKey}">${opts(12, s[monthKey])}</select><span>月</span>
+      <select class="select" aria-label="日" data-field="setup.${dayKey}">${opts(31, s[dayKey])}</select><span>日</span>
+    </div></div>`;
+}
+
+function toMonthDay(m, d) {
+  if (!m && !d) return "";
+  if (!m || !d) return null;
+  const mm = Number(m); const dd = Number(d);
+  const max = new Date(2024, mm, 0).getDate(); // うるう年の2月29日も選べるように2024年で数える
+  if (dd > max) return null;
   return `${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
 }
 
@@ -374,10 +387,8 @@ function viewSetup() {
       ${s.results.length ? `<div class="place-results">${s.results.map((r, i) => `<button type="button" data-act="pick-place" data-index="${i}" aria-pressed="${s.place && s.place.label === r.label}">${esc(r.label)}</button>`).join("")}</div>` : ""}
       <div class="field"><label for="f-payday">給料日(なくてもよい)</label>
         <input id="f-payday" class="input" type="number" inputmode="numeric" min="1" max="31" placeholder="例 21" value="${esc(s.payday)}" data-field="setup.payday"></div>
-      <div class="field"><label for="f-b1">誕生日(なくてもよい)</label>
-        <input id="f-b1" class="input" type="text" inputmode="numeric" placeholder="例 3/15" value="${esc(s.birthday1)}" data-field="setup.birthday1"></div>
-      <div class="field"><label for="f-b2">もう一人の誕生日(なくてもよい)</label>
-        <input id="f-b2" class="input" type="text" inputmode="numeric" placeholder="例 10/2" value="${esc(s.birthday2)}" data-field="setup.birthday2"></div>
+      ${birthdayPicker("l-b1", "誕生日", "b1m", "b1d")}
+      ${birthdayPicker("l-b2", "もう一人の誕生日", "b2m", "b2d")}
       ${s.error ? `<p class="error">${esc(s.error)}</p>` : ""}
       <button type="submit" class="primary">はじめる</button>
       <button type="button" class="text-btn text-btn--quiet" data-act="setup-back">合言葉を入れ直す</button>
@@ -617,10 +628,10 @@ async function submitSetup2() {
   const payday = s.payday ? Number(s.payday) : null;
   if (payday !== null && !(payday >= 1 && payday <= 31)) { s.error = "給料日は1〜31の数字で入れてください。"; render(true); return; }
   const birthdays = [];
-  for (const b of [s.birthday1, s.birthday2]) {
-    if (!b.trim()) continue;
-    const md = parseBirthday(b);
-    if (!md) { s.error = "誕生日は「3/15」のように入れてください。"; render(true); return; }
+  for (const [m, d] of [[s.b1m, s.b1d], [s.b2m, s.b2d]]) {
+    const md = toMonthDay(m, d);
+    if (md === "") continue;
+    if (md === null) { s.error = "誕生日は、月と日の両方を正しく選んでください。"; render(true); return; }
     birthdays.push(md);
   }
   try {
